@@ -1,6 +1,4 @@
-{:max-blank-lines
- 1
- :rules
+{:rules
  {:indentation
   {:indents
    {.then                              [[:inner 0]]
@@ -71,7 +69,7 @@
   {:enabled? false}
 
   :blank-lines
-  {:padding-lines 1}
+  {:padding-lines 2}
 
   :functions
 
