@@ -2,10 +2,12 @@
  ["src/tasks"]
 
  :tasks
- {init
-  (do
-    (require 'tasks)
-    (def source-paths ["src" "test"]))
+ {:init
+  (def source-paths ["src" "test"])
+
+  :requires
+  ([tasks]
+   [babashka.fs :as fs])
 
   format-check
   {:depends [init]
