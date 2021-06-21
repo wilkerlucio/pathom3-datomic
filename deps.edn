@@ -2,7 +2,7 @@
  ["src/main"]
 
  :deps
- {com.wsscode/pathom3 {:git/url "https://github.com/wilkerlucio/pathom3" :sha "ca9ea82ef92f8113148b39b884639b2a9e25a29a"}}
+ {com.wsscode/pathom3 {:git/url "https://github.com/wilkerlucio/pathom3" :sha "00813aa7fb2d2d31c6734f2d26310000d55cde48"}}
 
  :aliases
  {:provided
