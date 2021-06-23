@@ -26,6 +26,7 @@
 
 (def db-config
   (assoc on-prem-config
+    ::pcd/dynamic-op-name `mbrainz
     ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!))
 
 (def whitelist
@@ -530,7 +531,7 @@
   (testing "add ident sub query part on ident fields"
     (is (= (pcd/inject-ident-subqueries
              {::pcd/ident-attributes #{:foo}}
-             [:foo])
+             (eql/query->ast [:foo]))
            [{:foo [:db/ident]}]))))
 
 (comment
@@ -561,186 +562,6 @@
                                  {:db/id      123
                                   :artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
              123)))))
-
-(def index-oir-output
-  `{:abstractRelease/artistCredit {#{:db/id} #{pcd/datomic-resolver}}
-    :abstractRelease/artists      {#{:db/id} #{pcd/datomic-resolver}}
-    :abstractRelease/gid          {#{:db/id} #{pcd/datomic-resolver}}
-    :abstractRelease/name         {#{:db/id} #{pcd/datomic-resolver}}
-    :abstractRelease/type         {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/country               {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/endDay                {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/endMonth              {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/endYear               {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/gender                {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/gid                   {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/name                  {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/sortName              {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/startDay              {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/startMonth            {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/startYear             {#{:db/id} #{pcd/datomic-resolver}}
-    :artist/type                  {#{:db/id} #{pcd/datomic-resolver}}
-    :db/id                        {#{:abstractRelease/gid} #{pcd/datomic-resolver}
-                                   #{:artist/gid}          #{pcd/datomic-resolver}
-                                   #{:country/name}        #{pcd/datomic-resolver}
-                                   #{:db/ident}            #{pcd/datomic-resolver}
-                                   #{:label/gid}           #{pcd/datomic-resolver}
-                                   #{:language/name}       #{pcd/datomic-resolver}
-                                   #{:release/gid}         #{pcd/datomic-resolver}
-                                   #{:script/name}         #{pcd/datomic-resolver}}
-    :country/name                 {#{:db/id} #{pcd/datomic-resolver}}
-    :db.alter/attribute           {#{:db/id} #{pcd/datomic-resolver}}
-    :db.excise/attrs              {#{:db/id} #{pcd/datomic-resolver}}
-    :db.excise/before             {#{:db/id} #{pcd/datomic-resolver}}
-    :db.excise/beforeT            {#{:db/id} #{pcd/datomic-resolver}}
-    :db.install/attribute         {#{:db/id} #{pcd/datomic-resolver}}
-    :db.install/function          {#{:db/id} #{pcd/datomic-resolver}}
-    :db.install/partition         {#{:db/id} #{pcd/datomic-resolver}}
-    :db.install/valueType         {#{:db/id} #{pcd/datomic-resolver}}
-    :db.sys/partiallyIndexed      {#{:db/id} #{pcd/datomic-resolver}}
-    :db.sys/reId                  {#{:db/id} #{pcd/datomic-resolver}}
-    :db/cardinality               {#{:db/id} #{pcd/datomic-resolver}}
-    :db/code                      {#{:db/id} #{pcd/datomic-resolver}}
-    :db/doc                       {#{:db/id} #{pcd/datomic-resolver}}
-    :db/excise                    {#{:db/id} #{pcd/datomic-resolver}}
-    :db/fn                        {#{:db/id} #{pcd/datomic-resolver}}
-    :db/fulltext                  {#{:db/id} #{pcd/datomic-resolver}}
-    :db/ident                     {#{:db/id} #{pcd/datomic-resolver}}
-    :db/index                     {#{:db/id} #{pcd/datomic-resolver}}
-    :db/isComponent               {#{:db/id} #{pcd/datomic-resolver}}
-    :db/lang                      {#{:db/id} #{pcd/datomic-resolver}}
-    :db/noHistory                 {#{:db/id} #{pcd/datomic-resolver}}
-    :db/txInstant                 {#{:db/id} #{pcd/datomic-resolver}}
-    :db/unique                    {#{:db/id} #{pcd/datomic-resolver}}
-    :db/valueType                 {#{:db/id} #{pcd/datomic-resolver}}
-    :fressian/tag                 {#{:db/id} #{pcd/datomic-resolver}}
-    :label/country                {#{:db/id} #{pcd/datomic-resolver}}
-    :label/endDay                 {#{:db/id} #{pcd/datomic-resolver}}
-    :label/endMonth               {#{:db/id} #{pcd/datomic-resolver}}
-    :label/endYear                {#{:db/id} #{pcd/datomic-resolver}}
-    :label/gid                    {#{:db/id} #{pcd/datomic-resolver}}
-    :label/name                   {#{:db/id} #{pcd/datomic-resolver}}
-    :label/sortName               {#{:db/id} #{pcd/datomic-resolver}}
-    :label/startDay               {#{:db/id} #{pcd/datomic-resolver}}
-    :label/startMonth             {#{:db/id} #{pcd/datomic-resolver}}
-    :label/startYear              {#{:db/id} #{pcd/datomic-resolver}}
-    :label/type                   {#{:db/id} #{pcd/datomic-resolver}}
-    :language/name                {#{:db/id} #{pcd/datomic-resolver}}
-    :medium/format                {#{:db/id} #{pcd/datomic-resolver}}
-    :medium/name                  {#{:db/id} #{pcd/datomic-resolver}}
-    :medium/position              {#{:db/id} #{pcd/datomic-resolver}}
-    :medium/trackCount            {#{:db/id} #{pcd/datomic-resolver}}
-    :medium/tracks                {#{:db/id} #{pcd/datomic-resolver}}
-    :release/abstractRelease      {#{:db/id} #{pcd/datomic-resolver}}
-    :release/artistCredit         {#{:db/id} #{pcd/datomic-resolver}}
-    :release/artists              {#{:db/id} #{pcd/datomic-resolver}}
-    :release/barcode              {#{:db/id} #{pcd/datomic-resolver}}
-    :release/country              {#{:db/id} #{pcd/datomic-resolver}}
-    :release/day                  {#{:db/id} #{pcd/datomic-resolver}}
-    :release/gid                  {#{:db/id} #{pcd/datomic-resolver}}
-    :release/labels               {#{:db/id} #{pcd/datomic-resolver}}
-    :release/language             {#{:db/id} #{pcd/datomic-resolver}}
-    :release/media                {#{:db/id} #{pcd/datomic-resolver}}
-    :release/month                {#{:db/id} #{pcd/datomic-resolver}}
-    :release/name                 {#{:db/id} #{pcd/datomic-resolver}}
-    :release/packaging            {#{:db/id} #{pcd/datomic-resolver}}
-    :release/script               {#{:db/id} #{pcd/datomic-resolver}}
-    :release/status               {#{:db/id} #{pcd/datomic-resolver}}
-    :release/year                 {#{:db/id} #{pcd/datomic-resolver}}
-    :script/name                  {#{:db/id} #{pcd/datomic-resolver}}
-    :track/artistCredit           {#{:db/id} #{pcd/datomic-resolver}}
-    :track/artists                {#{:db/id} #{pcd/datomic-resolver}}
-    :track/duration               {#{:db/id} #{pcd/datomic-resolver}}
-    :track/name                   {#{:db/id} #{pcd/datomic-resolver}}
-    :track/position               {#{:db/id} #{pcd/datomic-resolver}}})
-
-(def index-io-output
-  {#{:abstractRelease/gid} {:db/id {}}
-   #{:artist/gid}          {:db/id {}}
-   #{:db/id}               {:abstractRelease/artistCredit {}
-                            :abstractRelease/artists      {:db/id {}}
-                            :abstractRelease/gid          {}
-                            :abstractRelease/name         {}
-                            :abstractRelease/type         {:db/id {}}
-                            :artist/country               {:db/id {}}
-                            :artist/endDay                {}
-                            :artist/endMonth              {}
-                            :artist/endYear               {}
-                            :artist/gender                {:db/id {}}
-                            :artist/gid                   {}
-                            :artist/name                  {}
-                            :artist/sortName              {}
-                            :artist/startDay              {}
-                            :artist/startMonth            {}
-                            :artist/startYear             {}
-                            :artist/type                  {:db/id {}}
-                            :country/name                 {}
-                            :fressian/tag                 {}
-                            :label/country                {:db/id {}}
-                            :label/endDay                 {}
-                            :label/endMonth               {}
-                            :label/endYear                {}
-                            :label/gid                    {}
-                            :label/name                   {}
-                            :label/sortName               {}
-                            :label/startDay               {}
-                            :label/startMonth             {}
-                            :label/startYear              {}
-                            :label/type                   {:db/id {}}
-                            :language/name                {}
-                            :medium/format                {:db/id {}}
-                            :medium/name                  {}
-                            :medium/position              {}
-                            :medium/trackCount            {}
-                            :medium/tracks                {:db/id {}}
-                            :release/abstractRelease      {:db/id {}}
-                            :release/artistCredit         {}
-                            :release/artists              {:db/id {}}
-                            :release/barcode              {}
-                            :release/country              {:db/id {}}
-                            :release/day                  {}
-                            :release/gid                  {}
-                            :release/labels               {:db/id {}}
-                            :release/language             {:db/id {}}
-                            :release/media                {:db/id {}}
-                            :release/month                {}
-                            :release/name                 {}
-                            :release/packaging            {:db/id {}}
-                            :release/script               {:db/id {}}
-                            :release/status               {}
-                            :release/year                 {}
-                            :script/name                  {}
-                            :track/artistCredit           {}
-                            :track/artists                {:db/id {}}
-                            :track/duration               {}
-                            :track/name                   {}
-                            :track/position               {}}
-   #{:country/name}        {:db/id {}}
-   #{:db/ident}            {:db/id {}}
-   #{:label/gid}           {:db/id {}}
-   #{:language/name}       {:db/id {}}
-   #{:release/gid}         {:db/id {}}
-   #{:script/name}         {:db/id {}}})
-
-(def index-idents-output
-  #{:abstractRelease/gid
-    :artist/gid
-    :country/name
-    :db/id
-    :db/ident
-    :label/gid
-    :language/name
-    :release/gid
-    :script/name})
-
-(deftest test-index-schema
-  (let [index (pcd/index-schema
-                (pcd/smart-config {::pcd/schema db-schema-output ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!}))]
-    (is (= (::pci/index-oir index)
-           index-oir-output))
-
-    (is (= (::pci/index-io index)
-           index-io-output))))
 
 (def index-io-secure-output
   {#{:artist/gid}   {:db/id {}}
@@ -780,6 +601,7 @@
     :country/name
     :release/gid})
 
+#_
 (deftest test-index-schema-secure
   (let [index (pcd/index-schema
                 (pcd/smart-config
@@ -825,10 +647,9 @@
     (is (= (::pci/autocomplete-ignore index)
            #{:db/id}))))
 
-(deftest test-post-process-entity
+(deftest post-process-entity-test
   (is (= (pcd/post-process-entity
            {::pcd/ident-attributes #{:artist/type}}
-           [:artist/type]
            {:artist/type {:db/ident :artist.type/person}})
          {:artist/type :artist.type/person})))
 
@@ -842,6 +663,7 @@
   {::pco/output [{:artist/artists-before-1600 [:db/id]}]}
   {:artist/artists-before-1600
    (pcd/query-entities env
+                       {::pcd/dynamic-op-name `mbrainz}
                        '{:where [[?e :artist/name ?name]
                                  [?e :artist/startYear ?year]
                                  [(< ?year 1600)]]})})
@@ -850,6 +672,7 @@
   {::pco/output [{:artist/artist-before-1600 [:db/id]}]}
   {:artist/artist-before-1600
    (pcd/query-entity env
+                     {::pcd/dynamic-op-name `mbrainz}
                      '{:where [[?e :artist/name ?name]
                                [?e :artist/startYear ?year]
                                [(< ?year 1600)]]})})
@@ -858,6 +681,7 @@
   {::pco/output [{:all-mediums [:db/id]}]}
   {:all-mediums
    (pcd/query-entities env
+                       {::pcd/dynamic-op-name `mbrainz}
                        '{:where [[?e :medium/name _]]})})
 
 (def registry
@@ -878,6 +702,8 @@
       ((requiring-resolve 'com.wsscode.pathom.viz.ws-connector.pathom3/connect-env)
        "debug")))
 
+(def parser (p.eql/boundary-interface env))
+
 (comment
   (d/q
     '[:find (pull ?e [:artist/sortName])
@@ -886,28 +712,36 @@
 
   (p.eql/process env
     {:db/id 756463999921184}
-    [:artist/super-name]))
+    [:artist/super-name
+     {:artist/country [:country/name]}]))
 
-#_(deftest test-datomic-parser
-    (testing "reading from :db/id"
-      (is (= (parser {}
-               [{[:db/id 637716744120508]
-                 [:artist/name]}])
-             {[:db/id 637716744120508] {:artist/name "Janis Joplin"}})))
-
-    (testing "reading from unique attribute"
-      (is (= (parser {}
-               [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+(deftest test-datomic-parser
+  (testing "reading from :db/id"
+    (is (= (parser
+             [{[:db/id 637716744120508]
                [:artist/name]}])
+           {[:db/id 637716744120508] {:artist/name "Janis Joplin"}})))
+
+  (testing "nested"
+    (is (= (parser
+             [{[:db/id 637716744120508]
+               [:artist/name
+                {:artist/country [:country/name]}]}])
+           {[:db/id 637716744120508] {:artist/name    "Janis Joplin",
+                                      :artist/country {:country/name "United States"}}})))
+
+  (testing "reading from unique attribute"
+    (is (= (parser [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+                     [:artist/name]}])
            {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
             {:artist/name "Janis Joplin"}})))
 
   (testing "explicit db"
     (is (= (parser {::pcd/db (:db-after (d/with (d/db conn)
-                                          [{:artist/gid  #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"
-                                            :artist/name "not Janis Joplin"}]))}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-               [:artist/name]}])
+                                                [{:artist/gid  #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"
+                                                  :artist/name "not Janis Joplin"}]))}
+                   [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+                     [:artist/name]}])
            {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
             {:artist/name "not Janis Joplin"}})))
 
@@ -924,17 +758,16 @@
 
   (testing "implicit dependency"
     (is (= (parser {}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-               [:artist/super-name]}])
+                   [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+                     [:artist/super-name]}])
            {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
             {:artist/super-name "SUPER - Janis Joplin"}})))
 
   (testing "process-query"
-    (is (= (parser {}
-             [{:artist/artists-before-1600
-               [:artist/super-name
-                {:artist/country
-                 [:country/name]}]}])
+    (is (= (parser [{:artist/artists-before-1600
+                     [:artist/super-name
+                      {:artist/country
+                       [:country/name]}]}])
            {:artist/artists-before-1600
             [{:artist/super-name "SUPER - Heinrich Schütz",
               :artist/country    {:country/name "Germany"}}
@@ -942,11 +775,11 @@
               :artist/country    {:country/name "United Kingdom"}}]}))
 
     (is (= (parser {}
-             [{:artist/artist-before-1600
-               [:artist/super-name
-                {:artist/country
-                 [:country/name
-                  :db/id]}]}])
+                   [{:artist/artist-before-1600
+                     [:artist/super-name
+                      {:artist/country
+                       [:country/name
+                        :db/id]}]}])
            {:artist/artist-before-1600
             {:artist/super-name "SUPER - Heinrich Schütz",
              :artist/country    {:country/name "Germany"
@@ -954,46 +787,47 @@
 
     (testing "partial missing information on entities"
       (is (= (parser {::pcd/db (-> (d/with db
-                                     [{:medium/name "val"}
-                                      {:medium/name "6val"
-                                       :artist/name "bla"}
-                                      {:medium/name "3"
-                                       :artist/name "bar"}])
+                                           [{:medium/name "val"}
+                                            {:medium/name "6val"
+                                             :artist/name "bla"}
+                                            {:medium/name "3"
+                                             :artist/name "bar"}])
                                    :db-after)}
-               [{:all-mediums
-                 [:artist/name :medium/name]}])
+                     [{:all-mediums
+                       [:artist/name :medium/name]}])
              {:all-mediums [{:artist/name "bar", :medium/name "3"}
-                            {:artist/name :com.wsscode.pathom.core/not-found, :medium/name "val"}
+                            {:medium/name "val",
+                             :com.wsscode.pathom3.connect.runner/attribute-errors {:artist/name {:com.wsscode.pathom3.error/error-type :com.wsscode.pathom3.error/attribute-unreachable}}}
                             {:artist/name "bla", :medium/name "6val"}]})))
 
     (testing "nested complex dependency"
       (is (= (parser {}
-               [{[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
-                 [{:release/artists
-                   [:artist/super-name]}]}])
+                     [{[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
+                       [{:release/artists
+                         [:artist/super-name]}]}])
              {[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
               {:release/artists [{:artist/super-name "SUPER - Horst Jankowski"}]}})))
 
     (testing "without subquery"
       (is (= (parser {}
-               [:artist/artists-before-1600])
+                     [:artist/artists-before-1600])
              {:artist/artists-before-1600
-              [{:db/id 690493302253222} {:db/id 716881581319519}]}))
+              [{} {}]}))
 
       (is (= (parser {}
-               [:artist/artist-before-1600])
+                     [:artist/artist-before-1600])
              {:artist/artist-before-1600
-              {:db/id 690493302253222}})))
+              {}})))
 
     (testing "ident attributes"
-      (is (= (parser {}
+      (is (= (parser
                [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
                  [:artist/type]}])
              {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
               {:artist/type :artist.type/person}}))
       (is (= (parser {}
-               [{[:db/id 637716744120508]
-                 [{:artist/type [:db/id]}]}])
+                     [{[:db/id 637716744120508]
+                       [{:artist/type [:db/id]}]}])
              {[:db/id 637716744120508]
               {:artist/type {:db/id 17592186045423}}})))))
 
@@ -1128,7 +962,7 @@
     "Janis Joplin")
 
   (d/q '{:find  [[(pull ?e [*]) ...]]
-         :in [$ ?gid]
+         :in    [$ ?gid]
          :where [[?e :artist/gid ?gid]]}
     db
     #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f")
