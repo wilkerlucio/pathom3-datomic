@@ -68,11 +68,7 @@
   :comments
   {:enabled? false}
 
-  :blank-lines
-  {:padding-lines 2}
-
   :functions
-
   {:enabled? false}
 
   :types

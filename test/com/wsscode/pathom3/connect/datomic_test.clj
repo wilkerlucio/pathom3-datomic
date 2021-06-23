@@ -1,21 +1,36 @@
 (ns com.wsscode.pathom3.connect.datomic-test
-  (:require [clojure.test :refer :all]
-            [com.wsscode.pathom.connect :as pc]
-            [com.wsscode.pathom3.connect.datomic :as pcd]
-            [com.wsscode.pathom3.connect.datomic.on-prem :refer [on-prem-config]]
-            [com.wsscode.pathom.connect.planner :as pcp]
-            [com.wsscode.pathom.core :as p]
-            [datomic.api :as d]
-            [edn-query-language.core :as eql]))
+  (:require
+    [clojure.test :refer [deftest is are run-tests testing]]
+    [com.wsscode.pathom3.connect.built-in.plugins :as pbip]
+    [com.wsscode.pathom3.connect.built-in.resolvers :as pbir]
+    [com.wsscode.pathom3.connect.datomic :as pcd]
+    [com.wsscode.pathom3.connect.datomic.on-prem :refer [on-prem-config]]
+    [com.wsscode.pathom3.connect.indexes :as pci]
+    [com.wsscode.pathom3.connect.operation :as pco]
+    [com.wsscode.pathom3.connect.planner :as pcp]
+    [com.wsscode.pathom3.interface.eql :as p.eql]
+    [com.wsscode.pathom3.plugin :as p.plugin]
+    [datomic.api :as d]
+    [edn-query-language.core :as eql]))
+
 
 (def uri "datomic:free://localhost:4334/mbrainz-1968-1973")
 (def conn (d/connect uri))
 
 (def db (d/db conn))
 
+
+(comment
+  (d/q
+    '[:find (pull ?e [*])
+     :where [?e :artist/name "The Beatles"]]
+    db))
+
+
 (def db-config
   (assoc on-prem-config
     ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!))
+
 
 (def whitelist
   #{:artist/country
@@ -46,6 +61,7 @@
     :track/duration
     :track/name
     :track/position})
+
 
 (def db-schema-output
   {:abstractRelease/artistCredit #:db{:cardinality #:db{:ident :db.cardinality/one}
@@ -500,9 +516,11 @@
                                       :ident       :track/position
                                       :valueType   #:db{:ident :db.type/long}}})
 
+
 (deftest test-db->schema
   (is (= (pcd/db->schema db-config db)
          db-schema-output)))
+
 
 (deftest test-schema->uniques
   (is (= (pcd/schema->uniques db-schema-output)
@@ -515,6 +533,7 @@
            :release/gid
            :script/name})))
 
+
 (deftest test-inject-ident-subqueries
   (testing "add ident sub query part on ident fields"
     (is (= (pcd/inject-ident-subqueries
@@ -522,29 +541,37 @@
              [:foo])
            [{:foo [:db/ident]}]))))
 
+
+(comment
+  (-> (pcd/smart-config (merge db-config {::pcd/conn conn}))
+      (pcd/index-schema)
+      pci/register))
+
+
 (deftest test-pick-ident-key
-  (let [config (pcd/normalize-config (merge db-config {::pcd/conn conn}))]
+  (let [config (pcd/smart-config (merge db-config {::pcd/conn conn}))]
     (testing "nothing available"
       (is (= (pcd/pick-ident-key config
-               {})
+                                 {})
              nil))
       (is (= (pcd/pick-ident-key config
-               {:id  123
-                :foo "bar"})
+                                 {:id  123
+                                  :foo "bar"})
              nil)))
     (testing "pick from :db/id"
       (is (= (pcd/pick-ident-key config
-               {:db/id 123})
+                                 {:db/id 123})
              123)))
     (testing "picking from schema unique"
       (is (= (pcd/pick-ident-key config
-               {:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
+                                 {:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
              [:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"])))
     (testing "prefer :db/id"
       (is (= (pcd/pick-ident-key config
-               {:db/id      123
-                :artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
+                                 {:db/id      123
+                                  :artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
              123)))))
+
 
 (def index-oir-output
   `{:abstractRelease/artistCredit {#{:db/id} #{pcd/datomic-resolver}}
@@ -638,6 +665,7 @@
     :track/name                   {#{:db/id} #{pcd/datomic-resolver}}
     :track/position               {#{:db/id} #{pcd/datomic-resolver}}})
 
+
 (def index-io-output
   {#{:abstractRelease/gid} {:db/id {}}
    #{:artist/gid}          {:db/id {}}
@@ -706,6 +734,7 @@
    #{:release/gid}         {:db/id {}}
    #{:script/name}         {:db/id {}}})
 
+
 (def index-idents-output
   #{:abstractRelease/gid
     :artist/gid
@@ -717,17 +746,16 @@
     :release/gid
     :script/name})
 
+
 (deftest test-index-schema
   (let [index (pcd/index-schema
-                (pcd/normalize-config {::pcd/schema db-schema-output ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!}))]
-    (is (= (::pc/index-oir index)
+                (pcd/smart-config {::pcd/schema db-schema-output ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!}))]
+    (is (= (::pci/index-oir index)
            index-oir-output))
 
-    (is (= (::pc/index-io index)
-           index-io-output))
+    (is (= (::pci/index-io index)
+           index-io-output))))
 
-    (is (= (::pc/idents index)
-           index-idents-output))))
 
 (def index-io-secure-output
   {#{:artist/gid}   {:db/id {}}
@@ -762,58 +790,58 @@
                      :track/position    {}}
    #{:release/gid}  {:db/id {}}})
 
+
 (def index-idents-secure-output
   #{:artist/gid
     :country/name
     :release/gid})
 
+
 (deftest test-index-schema-secure
   (let [index (pcd/index-schema
-                (pcd/normalize-config
+                (pcd/smart-config
                   (assoc db-config
                     ::pcd/conn conn
                     ::pcd/whitelist whitelist)))]
-    (is (= (::pc/index-oir index)
-           '{:artist/country    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :artist/gid        {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :artist/name       {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :artist/sortName   {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :artist/type       {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :country/name      {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :db/id             {#{:artist/gid}   #{com.wsscode.pathom.connect.datomic/datomic-resolver}
-                                 #{:country/name} #{com.wsscode.pathom.connect.datomic/datomic-resolver}
-                                 #{:release/gid}  #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :medium/format     {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :medium/name       {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :medium/position   {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :medium/trackCount {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :medium/tracks     {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/artists   {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/country   {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/day       {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/gid       {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/labels    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/language  {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/media     {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/month     {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/name      {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/packaging {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/script    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/status    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :release/year      {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :track/artists     {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :track/duration    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :track/name        {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}
-             :track/position    {#{:db/id} #{com.wsscode.pathom.connect.datomic/datomic-resolver}}}))
+    (is (= (::pci/index-oir index)
+           '{:artist/country    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :artist/gid        {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :artist/name       {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :artist/sortName   {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :artist/type       {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :country/name      {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :db/id             {#{:artist/gid}   #{com.wsscode.pathom3.connect.datomic/datomic-resolver}
+                                 #{:country/name} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}
+                                 #{:release/gid}  #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :medium/format     {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :medium/name       {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :medium/position   {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :medium/trackCount {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :medium/tracks     {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/artists   {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/country   {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/day       {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/gid       {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/labels    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/language  {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/media     {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/month     {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/name      {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/packaging {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/script    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/status    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :release/year      {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :track/artists     {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :track/duration    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :track/name        {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}
+             :track/position    {#{:db/id} #{com.wsscode.pathom3.connect.datomic/datomic-resolver}}}))
 
-    (is (= (::pc/index-io index)
+    (is (= (::pci/index-io index)
            index-io-secure-output))
 
-    (is (= (::pc/idents index)
-           index-idents-secure-output))
-
-    (is (= (::pc/autocomplete-ignore index)
+    (is (= (::pci/autocomplete-ignore index)
            #{:db/id}))))
+
 
 (deftest test-post-process-entity
   (is (= (pcd/post-process-entity
@@ -822,35 +850,39 @@
            {:artist/type {:db/ident :artist.type/person}})
          {:artist/type :artist.type/person})))
 
-(def super-name
-  (pc/single-attr-resolver :artist/name :artist/super-name #(str "SUPER - " %)))
 
-(pc/defresolver years-active [env {:artist/keys [startYear endYear]}]
-  {::pc/input  #{:artist/startYear :artist/endYear}
-   ::pc/output [:artist/active-years-count]}
+(def super-name
+  (pbir/single-attr-resolver :artist/name :artist/super-name #(str "SUPER - " %)))
+
+
+(pco/defresolver years-active [{:artist/keys [startYear endYear]}]
   {:artist/active-years-count (- endYear startYear)})
 
-(pc/defresolver artists-before-1600 [env _]
-  {::pc/output [{:artist/artists-before-1600 [:db/id]}]}
+
+(pco/defresolver artists-before-1600 [env _]
+  {::pco/output [{:artist/artists-before-1600 [:db/id]}]}
   {:artist/artists-before-1600
    (pcd/query-entities env
-     '{:where [[?e :artist/name ?name]
-               [?e :artist/startYear ?year]
-               [(< ?year 1600)]]})})
+                       '{:where [[?e :artist/name ?name]
+                                 [?e :artist/startYear ?year]
+                                 [(< ?year 1600)]]})})
 
-(pc/defresolver artist-before-1600 [env _]
-  {::pc/output [{:artist/artist-before-1600 [:db/id]}]}
+
+(pco/defresolver artist-before-1600 [env _]
+  {::pco/output [{:artist/artist-before-1600 [:db/id]}]}
   {:artist/artist-before-1600
    (pcd/query-entity env
-     '{:where [[?e :artist/name ?name]
-               [?e :artist/startYear ?year]
-               [(< ?year 1600)]]})})
+                     '{:where [[?e :artist/name ?name]
+                               [?e :artist/startYear ?year]
+                               [(< ?year 1600)]]})})
 
-(pc/defresolver all-mediums [env _]
-  {::pc/output [{:all-mediums [:db/id]}]}
+
+(pco/defresolver all-mediums [env _]
+  {::pco/output [{:all-mediums [:db/id]}]}
   {:all-mediums
    (pcd/query-entities env
-     '{:where [[?e :medium/name _]]})})
+                       '{:where [[?e :medium/name _]]})})
+
 
 (def registry
   [super-name
@@ -859,31 +891,40 @@
    artist-before-1600
    all-mediums])
 
-(def parser
-  (p/parser
-    {::p/env     {::p/reader               [p/map-reader
-                                            pc/reader3
-                                            pc/open-ident-reader
-                                            p/env-placeholder-reader]
-                  ::p/placeholder-prefixes #{">"}}
-     ::p/mutate  pc/mutate
-     ::p/plugins [(pc/connect-plugin {::pc/register registry})
-                  (pcd/datomic-connect-plugin (assoc db-config
-                                                ::pcd/conn conn
-                                                ::pcd/ident-attributes #{:artist/type}))
-                  p/error-handler-plugin
-                  p/trace-plugin]}))
 
-(deftest test-datomic-parser
-  (testing "reading from :db/id"
-    (is (= (parser {}
-             [{[:db/id 637716744120508]
-               [:artist/name]}])
-           {[:db/id 637716744120508] {:artist/name "Janis Joplin"}})))
+(def env
+  (-> (pci/register
+        [registry])
+      (pcd/connect-datomic
+        (assoc db-config
+          ::pcd/conn conn
+          ::pcd/ident-attributes #{:artist/type}))
+      (p.plugin/register (pbip/attribute-errors-plugin))
+      ((requiring-resolve 'com.wsscode.pathom.viz.ws-connector.pathom3/connect-env)
+       "debug")))
 
-  (testing "reading from unique attribute"
-    (is (= (parser {}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+
+(comment
+  (d/q
+    '[:find (pull ?e [:artist/sortName])
+      :in $ ?e]
+    db 756463999921184)
+
+  (p.eql/process env
+    {:db/id 756463999921184}
+    [:artist/super-name]))
+
+
+#_(deftest test-datomic-parser
+    (testing "reading from :db/id"
+      (is (= (parser {}
+               [{[:db/id 637716744120508]
+                 [:artist/name]}])
+             {[:db/id 637716744120508] {:artist/name "Janis Joplin"}})))
+
+    (testing "reading from unique attribute"
+      (is (= (parser {}
+               [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
                [:artist/name]}])
            {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
             {:artist/name "Janis Joplin"}})))
@@ -983,83 +1024,84 @@
              {[:db/id 637716744120508]
               {:artist/type {:db/id 17592186045423}}})))))
 
-(def secure-parser
-  (p/parser
-    {::p/env     {::p/reader               [p/map-reader
-                                            pc/reader3
-                                            pc/open-ident-reader
-                                            p/env-placeholder-reader]
-                  ::p/placeholder-prefixes #{">"}}
-     ::p/mutate  pc/mutate
-     ::p/plugins [(pc/connect-plugin {::pc/register registry})
-                  (pcd/datomic-connect-plugin
-                    (assoc db-config
-                      ::pcd/conn conn
-                      ::pcd/whitelist whitelist
-                      ::pcd/ident-attributes #{:artist/type}))
-                  p/error-handler-plugin
-                  p/trace-plugin]}))
 
-(deftest test-datomic-secure-parser
-  (testing "don't allow access with :db/id"
-    (is (= (secure-parser {}
-             [{[:db/id 637716744120508]
-               [:artist/name]}])
-           {[:db/id 637716744120508] {:artist/name ::p/not-found}})))
+;(def secure-parser
+;  (p/parser
+;    {::p/env     {::p/reader               [p/map-reader
+;                                            pc/reader3
+;                                            pc/open-ident-reader
+;                                            p/env-placeholder-reader]
+;                  ::p/placeholder-prefixes #{">"}}
+;     ::p/mutate  pc/mutate
+;     ::p/plugins [(pc/connect-plugin {::pc/register registry})
+;                  (pcd/connect-datomic
+;                    (assoc db-config
+;                      ::pcd/conn conn
+;                      ::pcd/whitelist whitelist
+;                      ::pcd/ident-attributes #{:artist/type}))
+;                  p/error-handler-plugin
+;                  p/trace-plugin]}))
 
-  (testing "not found for fields not listed"
-    (is (= (secure-parser {}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-               [:artist/name :artist/gender]}])
-           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-            {:artist/name   "Janis Joplin"
-             :artist/gender ::p/not-found}})))
-
-  (testing "not found for :db/id when its not allowed"
-    (is (= (secure-parser {}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-               [:artist/name :db/id]}])
-           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-            {:artist/name "Janis Joplin"
-             :db/id       ::p/not-found}})))
-
-  (testing "implicit dependency"
-    (is (= (secure-parser {}
-             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-               [:artist/super-name]}])
-           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-            {:artist/super-name "SUPER - Janis Joplin"}})))
-
-  (testing "process-query"
-    (is (= (secure-parser {}
-             [{:artist/artists-before-1600
-               [:artist/super-name
-                {:artist/country
-                 [:country/name]}]}])
-           {:artist/artists-before-1600
-            [{:artist/super-name "SUPER - Heinrich Schütz",
-              :artist/country    {:country/name "Germany"}}
-             {:artist/super-name "SUPER - Choir of King's College, Cambridge",
-              :artist/country    {:country/name "United Kingdom"}}]}))
-
-    (is (= (secure-parser {}
-             [{:artist/artist-before-1600
-               [:artist/super-name
-                {:artist/country
-                 [:country/name
-                  :db/id]}]}])
-           {:artist/artist-before-1600
-            {:artist/super-name "SUPER - Heinrich Schütz",
-             :artist/country    {:country/name "Germany"
-                                 :db/id        17592186045657}}}))
-
-    (testing "nested complex dependency"
-      (is (= (secure-parser {}
-               [{[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
-                 [{:release/artists
-                   [:artist/super-name]}]}])
-             {[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
-              {:release/artists [{:artist/super-name "SUPER - Horst Jankowski"}]}})))))
+;(deftest test-datomic-secure-parser
+;  (testing "don't allow access with :db/id"
+;    (is (= (secure-parser {}
+;             [{[:db/id 637716744120508]
+;               [:artist/name]}])
+;           {[:db/id 637716744120508] {:artist/name ::p/not-found}})))
+;
+;  (testing "not found for fields not listed"
+;    (is (= (secure-parser {}
+;             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;               [:artist/name :artist/gender]}])
+;           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;            {:artist/name   "Janis Joplin"
+;             :artist/gender ::p/not-found}})))
+;
+;  (testing "not found for :db/id when its not allowed"
+;    (is (= (secure-parser {}
+;             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;               [:artist/name :db/id]}])
+;           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;            {:artist/name "Janis Joplin"
+;             :db/id       ::p/not-found}})))
+;
+;  (testing "implicit dependency"
+;    (is (= (secure-parser {}
+;             [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;               [:artist/super-name]}])
+;           {[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
+;            {:artist/super-name "SUPER - Janis Joplin"}})))
+;
+;  (testing "process-query"
+;    (is (= (secure-parser {}
+;             [{:artist/artists-before-1600
+;               [:artist/super-name
+;                {:artist/country
+;                 [:country/name]}]}])
+;           {:artist/artists-before-1600
+;            [{:artist/super-name "SUPER - Heinrich Schütz",
+;              :artist/country    {:country/name "Germany"}}
+;             {:artist/super-name "SUPER - Choir of King's College, Cambridge",
+;              :artist/country    {:country/name "United Kingdom"}}]}))
+;
+;    (is (= (secure-parser {}
+;             [{:artist/artist-before-1600
+;               [:artist/super-name
+;                {:artist/country
+;                 [:country/name
+;                  :db/id]}]}])
+;           {:artist/artist-before-1600
+;            {:artist/super-name "SUPER - Heinrich Schütz",
+;             :artist/country    {:country/name "Germany"
+;                                 :db/id        17592186045657}}}))
+;
+;    (testing "nested complex dependency"
+;      (is (= (secure-parser {}
+;               [{[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
+;                 [{:release/artists
+;                   [:artist/super-name]}]}])
+;             {[:release/gid #uuid"b89a6f8b-5784-41d2-973d-dcd4d99b05c2"]
+;              {:release/artists [{:artist/super-name "SUPER - Horst Jankowski"}]}})))))
 
 (comment
   (pcd/config-parser db-config {::pcd/conn conn}
@@ -1070,18 +1112,13 @@
   (pcp/compute-run-graph
     (merge
       (-> (pcd/index-schema
-            (pcd/normalize-config (merge db-config {::pcd/conn conn})))
+            (pcd/smart-config (merge db-config {::pcd/conn conn})))
           (pc/register registry))
       {:edn-query-language.ast/node (eql/query->ast
                                       [{:release/artists
                                         [:artist/super-name]}])
        ::pcp/available-data         {:db/id {}}}))
 
-  (parser {}
-    [{::pc/indexes
-      [::pc/index-oir]}])
-
-  :q [:find ?a :where [?e ?a _] [(< ?e 100)]]
   (parser {}
     [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
       [:artist/active-years-count]}])
