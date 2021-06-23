@@ -11,7 +11,6 @@
     [com.wsscode.pathom3.interface.smart-map :as psm]
     [edn-query-language.core :as eql]))
 
-
 (s/def ::id qualified-symbol?)
 (s/def ::db any?)
 (s/def ::schema (s/map-of ::p.attr/attribute map?))
@@ -19,38 +18,30 @@
 (s/def ::schema-uniques ::schema-keys)
 (s/def ::ident-attributes ::schema-keys)
 
-
 (s/def ::whitelist
   (s/or :whitelist (s/coll-of ::p.attr/attribute :kind set?)
         :all-all #{::DANGER_ALLOW_ALL!}))
-
 
 (s/def ::schema-entry
   (s/keys
     :req [:db/ident :db/id :db/valueType :db/cardinality]
     :opt [:db/doc :db/unique]))
 
-
 (s/def :db/ident keyword?)
 (s/def ::schema (s/map-of :db/ident ::schema-entry))
-
 
 (defn raw-datomic-q [{::keys [datomic-driver-q]} & args]
   (apply datomic-driver-q args))
 
-
 (defn raw-datomic-db [{::keys [datomic-driver-db]} conn]
   (datomic-driver-db conn))
-
 
 (defn allowed-attr? [{::keys [whitelist]} attr]
   (or (and (set? whitelist) (contains? whitelist attr))
       (= ::DANGER_ALLOW_ALL! whitelist)))
 
-
 (defn db-id-allowed? [config]
   (allowed-attr? config :db/id))
-
 
 (defn db->schema
   "Extracts the schema from a Datomic db."
@@ -69,7 +60,6 @@
              schema))
          {})))
 
-
 (defn schema->uniques
   "Return a set with the ident of the unique attributes in the schema."
   [schema]
@@ -78,7 +68,6 @@
        (filter :db/unique)
        (into #{} (map :db/ident))))
 
-
 (def registry
   [(pbir/single-attr-with-env-resolver ::conn ::db raw-datomic-db)
    (pbir/single-attr-with-env-resolver ::db ::schema db->schema)
@@ -86,20 +75,16 @@
    (pbir/single-attr-resolver ::schema ::schema-uniques schema->uniques)
    (pbir/constantly-resolver ::ident-attributes #{})])
 
-
 (def config-env
   (-> (pci/register registry)))
-
 
 (defn smart-config
   "Fulfill missing configuration options using inferences."
   [config]
   (psm/smart-map (merge config-env config) config))
 
-
 (defn- prop [k]
   {:type :prop :dispatch-key k :key k})
-
 
 (defn inject-ident-subqueries [{::keys [ident-attributes]} query]
   (->> query
@@ -110,7 +95,6 @@
                   (assoc ast :type :join :query [:db/ident] :children [(prop :db/ident)])
                   ast))))
        eql/ast->query))
-
 
 (defn pick-ident-key
   "Figures which key to use to request data from Datomic. This will
@@ -127,7 +111,6 @@
       (if-let [attr (first available)]
         [attr (get m attr)]))))
 
-
 (defn post-process-entity
   "Post process the result from the datomic query. Operations that it does:
   - Pull :db/ident from ident fields"
@@ -140,10 +123,8 @@
   ;  subquery)
   entity)
 
-
 (defn node-subquery [{::pcp/keys [node]}]
   (eql/ast->query (::pcp/foreign-ast node)))
-
 
 (defn datomic-resolve
   "Runs the resolver to fetch Datomic data from identities."
@@ -176,7 +157,6 @@
                                               db
                                               v)))))))
 
-
 ; region query helpers
 
 (defn entity-subquery
@@ -192,7 +172,6 @@
           datomic-node (pcp/get-node graph (-> graph ::pcp/index-syms (get `datomic-resolver) first))
           subquery     (node-subquery {::pcp/node datomic-node})]
       (conj subquery :db/id)))
-
 
 (defn query-entities
   "Use this helper from inside a resolver to run a Datomic query.
@@ -222,7 +201,6 @@
       (raw-datomic-q env (assoc dquery :find [(list 'pull '?e (inject-ident-subqueries env subquery))])
                      db))))
 
-
 (defn query-entity
   "Like query-entities, but returns a single result. This leverage Datomic
   single result :find, meaning it is effectively more efficient than query-entities."
@@ -233,12 +211,10 @@
                            (raw-datomic-q env (assoc dquery :find [(list 'pull '?e (inject-ident-subqueries env subquery))])
                                           db)))))
 
-
 ; endregion
 
 (defn ref-attribute? [{::keys [schema]} attr]
   (= :db.type/ref (get-in schema [attr :db/valueType :db/ident])))
-
 
 (defn index-schema
   "Creates Pathom index from Datomic schema."
@@ -263,7 +239,6 @@
                     ::pco/resolve           (fn [env input]
                                               (datomic-resolve config (assoc env ::db (raw-datomic-db config (::conn config))) input))})
      entity-resolver]))
-
 
 (>defn connect-datomic
   "Plugin to add datomic integration.

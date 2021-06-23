@@ -80,7 +80,7 @@
     <orderEntry type="library" name="Deps: org.slf4j/jul-to-slf4j:1.7.7" level="project" />
     <orderEntry type="library" name="Deps: commons-collections:3.2.2" level="project" />
     <orderEntry type="library" name="Deps: org.openjfx/javafx-graphics:15.0.1" level="project" />
-    <orderEntry type="library" name="Deps: com.wsscode/pathom3:00813a" level="project" />
+    <orderEntry type="library" name="Deps: Local com.wsscode/pathom3" level="project" />
     <orderEntry type="library" name="Deps: org.apache.geronimo.specs/geronimo-json_1.0_spec:1.0-alpha-1" level="project" />
     <orderEntry type="library" name="Deps: com.googlecode.lanterna/lanterna:3.0.3" level="project" />
     <orderEntry type="library" name="Deps: babashka/clojure-lanterna:0.9.8-SNAPSHOT" level="project" />

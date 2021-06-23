@@ -13,12 +13,10 @@
     [datomic.api :as d]
     [edn-query-language.core :as eql]))
 
-
 (def uri "datomic:free://localhost:4334/mbrainz-1968-1973")
 (def conn (d/connect uri))
 
 (def db (d/db conn))
-
 
 (comment
   (d/q
@@ -26,11 +24,9 @@
      :where [?e :artist/name "The Beatles"]]
     db))
 
-
 (def db-config
   (assoc on-prem-config
     ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!))
-
 
 (def whitelist
   #{:artist/country
@@ -61,7 +57,6 @@
     :track/duration
     :track/name
     :track/position})
-
 
 (def db-schema-output
   {:abstractRelease/artistCredit #:db{:cardinality #:db{:ident :db.cardinality/one}
@@ -516,11 +511,9 @@
                                       :ident       :track/position
                                       :valueType   #:db{:ident :db.type/long}}})
 
-
 (deftest test-db->schema
   (is (= (pcd/db->schema db-config db)
          db-schema-output)))
-
 
 (deftest test-schema->uniques
   (is (= (pcd/schema->uniques db-schema-output)
@@ -533,7 +526,6 @@
            :release/gid
            :script/name})))
 
-
 (deftest test-inject-ident-subqueries
   (testing "add ident sub query part on ident fields"
     (is (= (pcd/inject-ident-subqueries
@@ -541,12 +533,10 @@
              [:foo])
            [{:foo [:db/ident]}]))))
 
-
 (comment
   (-> (pcd/smart-config (merge db-config {::pcd/conn conn}))
       (pcd/index-schema)
       pci/register))
-
 
 (deftest test-pick-ident-key
   (let [config (pcd/smart-config (merge db-config {::pcd/conn conn}))]
@@ -571,7 +561,6 @@
                                  {:db/id      123
                                   :artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"})
              123)))))
-
 
 (def index-oir-output
   `{:abstractRelease/artistCredit {#{:db/id} #{pcd/datomic-resolver}}
@@ -665,7 +654,6 @@
     :track/name                   {#{:db/id} #{pcd/datomic-resolver}}
     :track/position               {#{:db/id} #{pcd/datomic-resolver}}})
 
-
 (def index-io-output
   {#{:abstractRelease/gid} {:db/id {}}
    #{:artist/gid}          {:db/id {}}
@@ -734,7 +722,6 @@
    #{:release/gid}         {:db/id {}}
    #{:script/name}         {:db/id {}}})
 
-
 (def index-idents-output
   #{:abstractRelease/gid
     :artist/gid
@@ -746,7 +733,6 @@
     :release/gid
     :script/name})
 
-
 (deftest test-index-schema
   (let [index (pcd/index-schema
                 (pcd/smart-config {::pcd/schema db-schema-output ::pcd/whitelist ::pcd/DANGER_ALLOW_ALL!}))]
@@ -755,7 +741,6 @@
 
     (is (= (::pci/index-io index)
            index-io-output))))
-
 
 (def index-io-secure-output
   {#{:artist/gid}   {:db/id {}}
@@ -790,12 +775,10 @@
                      :track/position    {}}
    #{:release/gid}  {:db/id {}}})
 
-
 (def index-idents-secure-output
   #{:artist/gid
     :country/name
     :release/gid})
-
 
 (deftest test-index-schema-secure
   (let [index (pcd/index-schema
@@ -842,7 +825,6 @@
     (is (= (::pci/autocomplete-ignore index)
            #{:db/id}))))
 
-
 (deftest test-post-process-entity
   (is (= (pcd/post-process-entity
            {::pcd/ident-attributes #{:artist/type}}
@@ -850,14 +832,11 @@
            {:artist/type {:db/ident :artist.type/person}})
          {:artist/type :artist.type/person})))
 
-
 (def super-name
   (pbir/single-attr-resolver :artist/name :artist/super-name #(str "SUPER - " %)))
 
-
 (pco/defresolver years-active [{:artist/keys [startYear endYear]}]
   {:artist/active-years-count (- endYear startYear)})
-
 
 (pco/defresolver artists-before-1600 [env _]
   {::pco/output [{:artist/artists-before-1600 [:db/id]}]}
@@ -867,7 +846,6 @@
                                  [?e :artist/startYear ?year]
                                  [(< ?year 1600)]]})})
 
-
 (pco/defresolver artist-before-1600 [env _]
   {::pco/output [{:artist/artist-before-1600 [:db/id]}]}
   {:artist/artist-before-1600
@@ -876,13 +854,11 @@
                                [?e :artist/startYear ?year]
                                [(< ?year 1600)]]})})
 
-
 (pco/defresolver all-mediums [env _]
   {::pco/output [{:all-mediums [:db/id]}]}
   {:all-mediums
    (pcd/query-entities env
                        '{:where [[?e :medium/name _]]})})
-
 
 (def registry
   [super-name
@@ -890,7 +866,6 @@
    artists-before-1600
    artist-before-1600
    all-mediums])
-
 
 (def env
   (-> (pci/register
@@ -903,7 +878,6 @@
       ((requiring-resolve 'com.wsscode.pathom.viz.ws-connector.pathom3/connect-env)
        "debug")))
 
-
 (comment
   (d/q
     '[:find (pull ?e [:artist/sortName])
@@ -913,7 +887,6 @@
   (p.eql/process env
     {:db/id 756463999921184}
     [:artist/super-name]))
-
 
 #_(deftest test-datomic-parser
     (testing "reading from :db/id"
@@ -1024,7 +997,6 @@
              {[:db/id 637716744120508]
               {:artist/type {:db/id 17592186045423}}})))))
 
-
 ;(def secure-parser
 ;  (p/parser
 ;    {::p/env     {::p/reader               [p/map-reader
@@ -1104,47 +1076,21 @@
 ;              {:release/artists [{:artist/super-name "SUPER - Horst Jankowski"}]}})))))
 
 (comment
-  (pcd/config-parser db-config {::pcd/conn conn}
-    [::pcd/schema])
-
-  (pcd/config-parser db-config {::pcd/conn conn} [::pcd/schema-keys])
-
   (pcp/compute-run-graph
     (merge
       (-> (pcd/index-schema
             (pcd/smart-config (merge db-config {::pcd/conn conn})))
-          (pc/register registry))
+          (pci/register registry))
       {:edn-query-language.ast/node (eql/query->ast
                                       [{:release/artists
                                         [:artist/super-name]}])
        ::pcp/available-data         {:db/id {}}}))
-
-  (parser {}
-    [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-      [:artist/active-years-count]}])
-
-  (parser {}
-    [{[:artist/gid #uuid"76c9a186-75bd-436a-85c0-823e3efddb7f"]
-      [:artist/type]}])
 
   (pcd/index-io {::pcd/schema         db-schema-output
                  ::pcd/schema-uniques (pcd/schema->uniques db-schema-output)})
 
   (pcd/index-idents {::pcd/schema         db-schema-output
                      ::pcd/schema-uniques (pcd/schema->uniques db-schema-output)})
-
-  (parser {}
-    [{:artist/artist-before-1600
-      [:artist/name
-       :artist/active-years-count
-       {:artist/country
-        [:country/name]}]}])
-
-  (is (= (parser {}
-           [{[:db/id 637716744120508]
-             [:artist/type]}])
-         {[:db/id 637716744120508]
-          {:artist/type :artist.type/person}}))
 
   (d/q '[:find (pull ?e [:artist/name]) :where [?e :medium/name _]]
     (-> (d/with db
@@ -1168,7 +1114,7 @@
                        :db/valueType
                        :db/cardinality] %)))
 
-  (pcd/db->schema db)
+  (pcd/db->schema db-config db)
   (d/q '[:find ?id ?type ?gender ?e
          :in $ ?name
          :where
