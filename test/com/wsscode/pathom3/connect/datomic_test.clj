@@ -528,8 +528,6 @@
              (eql/query->ast [:foo]))
            [{:foo [:db/ident]}]))))
 
-22
-
 (deftest test-pick-ident-key
   (let [config (pcd/smart-config (merge db-config {::pcd/conn conn}))]
     (testing "nothing available"

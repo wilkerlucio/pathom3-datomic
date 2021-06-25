@@ -153,7 +153,6 @@
 
       (eql/ident? id)
       (let [[k v] id]
-        (tap> ["RES" id foreign-ast])
         (post-process-entity config
                              (ffirst
                                (raw-datomic-q config [:find (list 'pull '?e (inject-ident-subqueries config foreign-ast))
