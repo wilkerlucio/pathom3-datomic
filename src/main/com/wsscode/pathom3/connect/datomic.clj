@@ -21,8 +21,8 @@
 (s/def ::schema-uniques ::schema-keys)
 (s/def ::ident-attributes ::schema-keys)
 
-(s/def ::whitelist
-  (s/or :whitelist (s/coll-of ::p.attr/attribute :kind set?)
+(s/def ::allow-list
+  (s/or :allow-list (s/coll-of ::p.attr/attribute :kind set?)
         :all-all #{::DANGER_ALLOW_ALL!}))
 
 (s/def ::schema-entry
@@ -39,9 +39,9 @@
 (defn raw-datomic-db [{::keys [datomic-driver-db]} conn]
   (datomic-driver-db conn))
 
-(defn allowed-attr? [{::keys [whitelist]} attr]
-  (or (and (set? whitelist) (contains? whitelist attr))
-      (= ::DANGER_ALLOW_ALL! whitelist)))
+(defn allowed-attr? [{::keys [allow-list]} attr]
+  (or (and (set? allow-list) (contains? allow-list attr))
+      (= ::DANGER_ALLOW_ALL! allow-list)))
 
 (defn db-id-allowed? [config]
   (allowed-attr? config :db/id))
@@ -93,18 +93,16 @@
   "When working with ident fields, datomic returns a reference type, but its common to
   want just the value instead. To help, you can tell Pathom which attributes you want
   to automatically pull the identity from, this will affect the queries (to include the
-  :db/ident as part of the request) and will pull that in post-process.
-
-  For example:
-
-  "
-  [{::keys [ident-attributes]} ast]
+  :db/ident as part of the request) and will pull that in post-process."
+  [{::keys [ident-attributes] :as config} ast]
   (->> ast
        (eql/transduce-children
-         (map (fn [{:keys [key query] :as ast}]
-                (if (and (contains? ident-attributes key) (not query))
-                  (assoc ast :type :join :query [:db/ident] :children [(prop :db/ident)])
-                  ast))))
+         (comp
+           (filter #(allowed-attr? config (:key %)))
+           (map (fn [{:keys [key query] :as ast}]
+                  (if (and (contains? ident-attributes key) (not query))
+                    (assoc ast :type :join :query [:db/ident] :children [(prop :db/ident)])
+                    ast)))))
        eql/ast->query))
 
 (defn pick-ident-key
@@ -155,6 +153,7 @@
 
       (eql/ident? id)
       (let [[k v] id]
+        (tap> ["RES" id foreign-ast])
         (post-process-entity config
                              (ffirst
                                (raw-datomic-q config [:find (list 'pull '?e (inject-ident-subqueries config foreign-ast))
@@ -178,7 +177,7 @@
                         ::pco/op-name (::pco/op-name node)))
                     (pfsd/shape-descriptor->ast))
         config  (get-in env [::datomic-config dynamic-op-name])]
-    (->> (raw-datomic-q config (assoc query :find [(list 'pull '?e (inject-ident-subqueries env sub-ast))])
+    (->> (raw-datomic-q config (assoc query :find [(list 'pull '?e (inject-ident-subqueries config sub-ast))])
                         (or db (raw-datomic-db config (::conn config))))
          (map (comp #(post-process-entity config %) #(or % {}) first)))))
 
@@ -188,8 +187,8 @@
   of the query will be populated by this function with [[pull ?e SUB_QUERY] '...].
   The SUB_QUERY will be computed by Pathom, considering the current user sub-query.
   Example resolver (using Datomic mbrainz sample database):
-      (pc/defresolver artists-before-1600 [env _]
-        {::pc/output [{:artist/artists-before-1600 [:db/id]}]}
+      (pco/defresolver artists-before-1600 [env _]
+        {::pco/output [{:artist/artists-before-1600 [:db/id]}]}
         {:artist/artists-before-1600
          (pcd/query-entities env
            '{:where [[?e :artist/name ?name]
@@ -229,7 +228,7 @@
                                          {field [:db/id]}
                                          field))))
                               (keys schema))
-        entity-resolver (pco/resolver 'datomic-entity
+        entity-resolver (pco/resolver (symbol (namespace dynamic-op-name) "datomic-entity-resolver")
                           {::pco/dynamic-name dynamic-op-name
                            ::pco/input        [:db/id]
                            ::pco/output       schema-output})]
@@ -246,7 +245,7 @@
        entity-resolver]
       (map
         (fn [attr]
-          (let [resolver-name (symbol "datomic-from-" (pbir/attr-munge attr))]
+          (let [resolver-name (symbol (namespace dynamic-op-name) (str "datomic-ident-" (pbir/attr-munge attr)))]
             (pco/resolver resolver-name
               {::pco/dynamic-name dynamic-op-name
                ::pco/input        [attr]
