@@ -17,5 +17,4 @@ pom.xml.asc
 .cpcache/
 .nrepl-port
 node_modules/
-src/demos
 .clj-kondo/.cache
