@@ -2,7 +2,8 @@
  ["src/main"]
 
  :deps
- {com.wsscode/pathom3 {:git/url "https://github.com/wilkerlucio/pathom3" :sha "00813aa7fb2d2d31c6734f2d26310000d55cde48"}}
+ {com.wsscode/pathom3 {:git/url "https://github.com/wilkerlucio/pathom3" :sha "00813aa7fb2d2d31c6734f2d26310000d55cde48"}
+  juxt/crux-core      {:mvn/version "21.06-1.17.1-beta"}}
 
  :aliases
  {:provided
