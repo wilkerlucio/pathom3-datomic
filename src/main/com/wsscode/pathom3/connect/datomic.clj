@@ -14,16 +14,11 @@
     [com.wsscode.pathom3.interface.smart-map :as psm]
     [edn-query-language.core :as eql]))
 
-(s/def ::dynamic-op-name qualified-symbol?)
 (s/def ::db any?)
 (s/def ::schema (s/map-of ::p.attr/attribute map?))
 (s/def ::schema-keys (s/coll-of ::p.attr/attribute :kind set?))
 (s/def ::schema-uniques ::schema-keys)
 (s/def ::ident-attributes ::schema-keys)
-
-(s/def ::allow-list
-  (s/or :allow-list (s/coll-of ::p.attr/attribute :kind set?)
-        :all-all #{::DANGER_ALLOW_ALL!}))
 
 (s/def ::schema-entry
   (s/keys
@@ -33,18 +28,14 @@
 (s/def :db/ident keyword?)
 (s/def ::schema (s/map-of :db/ident ::schema-entry))
 
+(defn datomic-entity-attribute [{:keys [::pco/op-name]}]
+  (keyword (namespace op-name) "datomic-entity"))
+
 (defn raw-datomic-q [{::keys [datomic-driver-q]} & args]
   (apply datomic-driver-q args))
 
 (defn raw-datomic-db [{::keys [datomic-driver-db]} conn]
   (datomic-driver-db conn))
-
-(defn allowed-attr? [{::keys [allow-list]} attr]
-  (or (and (set? allow-list) (contains? allow-list attr))
-      (= ::DANGER_ALLOW_ALL! allow-list)))
-
-(defn db-id-allowed? [config]
-  (allowed-attr? config :db/id))
 
 (defn db->schema
   "Extracts the schema from a Datomic db."
@@ -58,9 +49,7 @@
        (map first)
        (reduce
          (fn [schema entry]
-           (if (allowed-attr? env (:db/ident entry))
-             (assoc schema (:db/ident entry) entry)
-             schema))
+           (assoc schema (:db/ident entry) entry))
          {})))
 
 (defn schema->uniques
@@ -94,15 +83,13 @@
   want just the value instead. To help, you can tell Pathom which attributes you want
   to automatically pull the identity from, this will affect the queries (to include the
   :db/ident as part of the request) and will pull that in post-process."
-  [{::keys [ident-attributes] :as config} ast]
+  [{::keys [ident-attributes]} ast]
   (->> ast
        (eql/transduce-children
-         (comp
-           (filter #(allowed-attr? config (:key %)))
-           (map (fn [{:keys [key query] :as ast}]
-                  (if (and (contains? ident-attributes key) (not query))
-                    (assoc ast :type :join :query [:db/ident] :children [(prop :db/ident)])
-                    ast)))))
+         (map (fn [{:keys [key query] :as ast}]
+                (if (and (contains? ident-attributes key) (not query))
+                  (assoc ast :type :join :query [:db/ident] :children [(prop :db/ident)])
+                  ast))))
        eql/ast->query))
 
 (defn pick-ident-key
@@ -111,9 +98,8 @@
   Otherwise will look for some attribute that is a unique and is on
   the map, in case of multiple one will be selected by random. The
   format of the unique return is [:attribute value]."
-  [{::keys [schema-uniques] :as config} m]
-  (if (and (contains? m :db/id)
-           (db-id-allowed? config))
+  [{::keys [schema-uniques admin-mode?]} m]
+  (if (and (contains? m :db/id) admin-mode?)
     (:db/id m)
 
     (let [available (set/intersection schema-uniques (into #{} (keys m)))]
@@ -148,34 +134,34 @@
       (->> (raw-datomic-q config [:find (list 'pull '?e (inject-ident-subqueries config foreign-ast))
                                   :in '$ '?e]
                           db id)
-           (ffirst)
+           ffirst
            (post-process-entity config))
 
       (eql/ident? id)
       (let [[k v] id]
-        (post-process-entity config
-                             (ffirst
-                               (raw-datomic-q config [:find (list 'pull '?e (inject-ident-subqueries config foreign-ast))
-                                                      :in '$ '?v
-                                                      :where ['?e k '?v]]
-                                              db
-                                              v)))))))
+        (->> (raw-datomic-q config [:find (list 'pull '?e (inject-ident-subqueries config foreign-ast))
+                                    :in '$ '?v
+                                    :where ['?e k '?v]]
+                            db
+                            v)
+             ffirst
+             (post-process-entity config))))))
 
 ; region query helpers
 
 (defn datomic-subquery-q
   "Compute nested sub-query using the planner capabilities and run the query on Datomic
   pulling the necessary data out."
-  [{::keys [db] ::pcp/keys [node graph] :as env} {::keys [dynamic-op-name]} query]
-  (let [attr    (-> node ::pcp/expects ffirst)
+  [{::keys [db] ::pcp/keys [node graph] :as env} {:keys [::pco/op-name] ::p.attr/keys [attribute]} query]
+  (let [attr    (or attribute (-> node ::pcp/expects ffirst))
         ast     (get-in graph [::pcp/index-ast attr])
         sub-ast (-> (pcp/compute-dynamic-resolver-nested-requirements
                       (assoc env :edn-query-language.ast/node ast
-                        ::pco/dynamic-name dynamic-op-name
+                        ::pco/dynamic-name op-name
                         ::p.attr/attribute attr
                         ::pco/op-name (::pco/op-name node)))
                     (pfsd/shape-descriptor->ast))
-        config  (get-in env [::datomic-config dynamic-op-name])]
+        config  (get-in env [::datomic-config op-name])]
     (->> (raw-datomic-q config (assoc query :find [(list 'pull '?e (inject-ident-subqueries config sub-ast))])
                         (or db (raw-datomic-db config (::conn config))))
          (map (comp #(post-process-entity config %) #(or % {}) first)))))
@@ -211,6 +197,25 @@
   [env datomic-source dquery]
   (first (datomic-subquery-q env datomic-source dquery)))
 
+(defn make-resolver [op-name config output-attr f-or-query query-fn]
+  (pco/resolver op-name
+    (merge
+      (select-keys config [::pco/input ::pco/params])
+      {::pco/output [{output-attr [(datomic-entity-attribute config)]}]})
+    (fn [env input]
+      {output-attr
+       (query-fn env
+                 (assoc config ::p.attr/attribute output-attr)
+                 (if (fn? f-or-query)
+                   (f-or-query env input)
+                   f-or-query))})))
+
+(defn entity-resolver [op-name config output-attr f-or-query]
+  (make-resolver op-name config output-attr f-or-query query-entity))
+
+(defn entities-resolver [op-name config output-attr f-or-query]
+  (make-resolver op-name config output-attr f-or-query query-entities))
+
 ; endregion
 
 (defn ref-attribute? [{::keys [schema]} attr]
@@ -218,38 +223,44 @@
 
 (defn index-schema
   "Creates Pathom index from Datomic schema."
-  [{::keys [schema schema-uniques dynamic-op-name] :as config}]
-  (let [schema-output   (into []
+  [{::keys     [schema schema-uniques admin-mode?]
+    ::pco/keys [op-name] :as config}]
+  (let [entity-attr     (datomic-entity-attribute config)
+        schema-output   (into []
                               (comp
                                 (remove (comp #(some->> % namespace (re-find #"^db\.?"))))
                                 (map (fn [field]
                                        (if (ref-attribute? config field)
-                                         {field [:db/id]}
+                                         {field [entity-attr]}
                                          field))))
                               (keys schema))
-        entity-resolver (pco/resolver (symbol (namespace dynamic-op-name) "datomic-entity-resolver")
-                          {::pco/dynamic-name dynamic-op-name
-                           ::pco/input        [:db/id]
+        entity-resolver (pco/resolver (symbol (namespace op-name) "datomic-entity-resolver")
+                          {::pco/dynamic-name op-name
+                           ::pco/input        [entity-attr]
                            ::pco/output       schema-output})]
-    (into
-      [(pco/resolver {::datomic?              true
-                      ::pco/op-name           dynamic-op-name
-                      ::pco/cache?            false
-                      ::pco/dynamic-resolver? true
-                      ::pco/resolve           (fn [env input]
-                                                (datomic-resolve config
-                                                                 (merge {::db (raw-datomic-db config (::conn config))}
-                                                                        env)
-                                                                 input))})
-       entity-resolver]
-      (map
-        (fn [attr]
-          (let [resolver-name (symbol (namespace dynamic-op-name) (str "datomic-ident-" (pbir/attr-munge attr)))]
-            (pco/resolver resolver-name
-              {::pco/dynamic-name dynamic-op-name
-               ::pco/input        [attr]
-               ::pco/output       [:db/id]}))))
-      schema-uniques)))
+    (pci/register
+      {::pci/transient-attrs entity-attr}
+      (cond-> [(pco/resolver {::datomic?              true
+                              ::pco/op-name           op-name
+                              ::pco/cache?            false
+                              ::pco/dynamic-resolver? true
+                              ::pco/resolve           (fn [env input]
+                                                        (datomic-resolve config
+                                                                         (merge {::db (raw-datomic-db config (::conn config))}
+                                                                                env)
+                                                                         input))})
+               entity-resolver]
+
+        admin-mode?
+        (into
+          (map
+            (fn [attr]
+              (let [resolver-name (symbol (namespace op-name) (str "datomic-ident-" (pbir/attr-munge attr)))]
+                (pco/resolver resolver-name
+                  {::pco/dynamic-name op-name
+                   ::pco/input        [attr]
+                   ::pco/output       [entity-attr]}))))
+          (conj schema-uniques :db/id))))))
 
 (>defn connect-datomic
   "Plugin to add datomic integration.
@@ -260,10 +271,10 @@
   ::ident-attributes - a set containing the attributes to be treated as idents
   ::db - Datomic db, if not provided will be computed from ::conn
   "
-  [env {::keys [dynamic-op-name] :as config}]
-  [map? (s/keys :req [::dynamic-op-name ::conn] :opt [::ident-attributes]) => map?]
+  [env {:keys [::pco/op-name] :as config}]
+  [map? (s/keys :req [::pco/op-name ::conn] :opt [::ident-attributes]) => map?]
   (let [config'       (smart-config config)
         datomic-index (index-schema config')]
     (-> env
-        (assoc-in [::datomic-config dynamic-op-name] config)
+        (assoc-in [::datomic-config op-name] config)
         (pci/register datomic-index))))
