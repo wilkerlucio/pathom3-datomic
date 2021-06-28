@@ -1,3 +1,3 @@
 # Pathom 3 Datomic integration
 
-Working in progress.
+Work in progress.
