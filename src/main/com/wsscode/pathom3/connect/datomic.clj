@@ -244,7 +244,7 @@
                               ::pco/op-name           op-name
                               ::pco/cache?            false
                               ::pco/dynamic-resolver? true
-                              ::pco/resolve           (fn [env input]
+                              ::pco/resolve           (fn datomic-resolve-internal [env input]
                                                         (datomic-resolve config
                                                                          (merge {::db (raw-datomic-db config (::conn config))}
                                                                                 env)
@@ -266,9 +266,13 @@
   "Plugin to add datomic integration.
   Options:
 
-  ::id (required) - a unique identifier for this connection, as a symbol
+  ::pco/op-name (required) - a unique identifier for this connection, as a symbol
   ::conn (required) - Datomic connection
   ::ident-attributes - a set containing the attributes to be treated as idents
+  ::admin-mode? - boolean to set admin mode, in this mode it allows full access to
+  any datomic entity via :db/id or via some ident attribute. Note this is mode is not
+  secure for most applications, instead you should add manual access points so you
+  can make them secure. Check the docs for more details.
   ::db - Datomic db, if not provided will be computed from ::conn
   "
   [env {:keys [::pco/op-name] :as config}]
