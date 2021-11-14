@@ -98,13 +98,13 @@
   Otherwise will look for some attribute that is a unique and is on
   the map, in case of multiple one will be selected by random. The
   format of the unique return is [:attribute value]."
-  [{::keys [schema-uniques admin-mode?]} m]
-  (if (and (contains? m :db/id) admin-mode?)
-    (:db/id m)
-
-    (let [available (set/intersection schema-uniques (into #{} (keys m)))]
-      (if-let [attr (first available)]
-        [attr (get m attr)]))))
+  [{::keys [schema-uniques admin-mode?]} input]
+  (let [m (:com.wsscode.pathom3.connect.runner/node-resolver-input input)]
+    (if (and (contains? m :db/id) admin-mode?)
+      (:db/id m)
+      (let [available (set/intersection schema-uniques (into #{} (keys m)))]
+        (when-let [attr (first available)]
+          [attr (get m attr)])))))
 
 (defn post-process-entity
   "Post process the result from the datomic query. Operations that it does:
