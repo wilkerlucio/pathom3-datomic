@@ -125,7 +125,8 @@
    {::keys [db]
     :as    env}
    input]
-  (let [id          (pick-ident-key config input)
+  (let [input       (or (get input (datomic-entity-attribute config)) input)
+        id          (pick-ident-key config input)
         foreign-ast (-> env ::pcp/node ::pcp/foreign-ast)]
     (cond
       (nil? id) nil
@@ -155,7 +156,7 @@
   [{::keys [db] ::pcp/keys [node graph] :as env} {:keys [::pco/op-name] ::p.attr/keys [attribute]} query]
   (let [attr    (or attribute (-> node ::pcp/expects ffirst))
         ast     (get-in graph [::pcp/index-ast attr])
-        sub-ast (-> (pcp/compute-dynamic-resolver-nested-requirements
+        sub-ast (-> (pcp/compute-dynamic-nested-requirements
                       (assoc env :edn-query-language.ast/node ast
                         ::pco/dynamic-name op-name
                         ::p.attr/attribute attr

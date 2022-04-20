@@ -1,10 +1,6 @@
 {:config-paths  ["com.wsscode/pathom3"]
  :lint-as       {clojure.test.check.clojure-test/defspec clojure.core/def
-                 clojure.test.check.properties/for-all   clojure.core/let
-                 promesa.core/let                        clojure.core/let
-                 promesa.core/loop                       clojure.core/loop
-                 com.fulcrologic.guardrails.core/>def    clojure.spec.alpha/def
-                 com.fulcrologic.guardrails.core/>defn   clojure.core/defn}
+                 clojure.test.check.properties/for-all   clojure.core/let}
  :linters       {:invalid-arity       {:level :error}
                  :missing-else-branch {:level :off}
                  :unresolved-symbol   {:exclude [match? thrown-match?]}
