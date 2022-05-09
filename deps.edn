@@ -1,4 +1,5 @@
-{:paths
+{:mvn/repos {"datomic-cloud" {:url "s3://datomic-releases-1fc2183a/maven/releases"}}
+ :paths
  ["src/main"]
 
  :deps
@@ -19,9 +20,20 @@
 
   :test
   {:extra-paths ["test"]
-   :extra-deps  {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git" :sha "209b64504cb3bd3b99ecfec7937b358a879f55c1"}}
+   :extra-deps  {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git" :sha "209b64504cb3bd3b99ecfec7937b358a879f55c1"}
+                 com.datomic/client-cloud {:mvn/version "0.8.96"}
+                 com.datomic/dev-local    {:local/root "./dev-local-1.0.242.jar"}} ;; jar not included, see https://docs.datomic.com/cloud/dev-local.html for installation instructions}
+   :main-opts   ["-m" "cognitect.test-runner"]}
+
+  :test-local
+  {:extra-paths ["test"]
+   :extra-deps {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git" :sha "209b64504cb3bd3b99ecfec7937b358a879f55c1"}
+                com.datomic/client-cloud {:mvn/version "0.8.96"}
+                com.datomic/dev-local    {:local/root "./dev-local-1.0.242.jar"}} ;; jar not included, see https://docs.datomic.com/cloud/dev-local.html for installation instructions
    :main-opts   ["-m" "cognitect.test-runner"]}
 
   :test-cljs
   {:extra-paths ["test"]
    :extra-deps  {thheller/shadow-cljs {:mvn/version "2.11.9"}}}}}
+
+
