@@ -3,13 +3,14 @@
     [clojure.set :as set]
     [clojure.spec.alpha :as s]
     [clojure.walk :as walk]
-    [com.fulcrologic.guardrails.core :refer [<- => >def >defn >fdef ? |]]
+    [com.fulcrologic.guardrails.core :refer [=> >defn]]
     [com.wsscode.misc.coll :as coll]
     [com.wsscode.pathom3.attribute :as p.attr]
     [com.wsscode.pathom3.connect.built-in.resolvers :as pbir]
     [com.wsscode.pathom3.connect.indexes :as pci]
     [com.wsscode.pathom3.connect.operation :as pco]
     [com.wsscode.pathom3.connect.planner :as pcp]
+    [com.wsscode.pathom3.connect.runner :as pcr]
     [com.wsscode.pathom3.format.shape-descriptor :as pfsd]
     [com.wsscode.pathom3.interface.smart-map :as psm]
     [edn-query-language.core :as eql]))
@@ -245,11 +246,12 @@
                               ::pco/op-name           op-name
                               ::pco/cache?            false
                               ::pco/dynamic-resolver? true
-                              ::pco/resolve           (fn datomic-resolve-internal [env input]
+                              ::pco/resolve           (fn datomic-resolve-internal
+                                                        [env {::pcr/keys [node-resolver-input]}]
                                                         (datomic-resolve config
                                                                          (merge {::db (raw-datomic-db config (::conn config))}
                                                                                 env)
-                                                                         input))})
+                                                                         node-resolver-input))})
                entity-resolver]
 
         admin-mode?

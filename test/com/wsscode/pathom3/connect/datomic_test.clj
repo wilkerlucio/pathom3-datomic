@@ -600,8 +600,7 @@
         (assoc db-config
           ::pcd/conn conn
           ::pcd/admin-mode? true
-          ::pcd/ident-attributes #{:artist/type}))
-      (p.plugin/register (pbip/attribute-errors-plugin))))
+          ::pcd/ident-attributes #{:artist/type}))))
 
 (def request-admin (p.eql/boundary-interface env-admin))
 
